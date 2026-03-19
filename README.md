@@ -62,17 +62,17 @@ export GEMINI_API_KEY="your-key"
 
 ```bash
 # Transcribe only
-uv run tldm transcribe <drive-url-or-file-id>
+tldm transcribe <drive-url-or-file-id>
 
 # Transcribe + summarize
-uv run tldm summarize <drive-url-or-file-id>
+tldm summarize <drive-url-or-file-id>
 
 # Upload results to the same Drive folder
-uv run tldm summarize <drive-url-or-file-id> --upload
+tldm summarize <drive-url-or-file-id> --upload
 
 # Use a different model
-uv run tldm summarize <drive-url> --model gemini/gemini-2.5-flash
-uv run tldm summarize <drive-url> --summary-model openrouter/anthropic/claude-sonnet-4
+tldm summarize <drive-url> --model gemini/gemini-2.5-flash
+tldm summarize <drive-url> --summary-model openrouter/anthropic/claude-sonnet-4
 ```
 
 ## Configuration
