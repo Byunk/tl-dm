@@ -8,8 +8,8 @@ from tldm.config import Settings
 class TestSettings:
     def test_defaults(self):
         settings = Settings()
-        assert settings.transcription_model == "gemini/gemini-2.5-flash-lite"
-        assert settings.summary_model == "gemini/gemini-2.5-flash-lite"
+        assert settings.transcription_model == "gemini/gemini-3.1-flash-lite-preview"
+        assert settings.summary_model == "gemini/gemini-3.1-flash-lite-preview"
         assert settings.service_account_path is None
 
     def test_constructor_override(self):
