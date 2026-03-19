@@ -27,6 +27,7 @@ def main() -> None:
     sm_parser.add_argument("--model", "-m", help="Model for transcription")
     sm_parser.add_argument("--summary-model", help="Model for summary (defaults to --model)")
     sm_parser.add_argument("--upload", "-u", action="store_true", help="Upload results to the same Drive folder")
+    sm_parser.add_argument("--context", "-c", help="Context about this meeting (e.g. 'User interview for our product')")
 
     args = parser.parse_args()
     _setup_logging(verbose=args.verbose)
@@ -61,7 +62,7 @@ def _handle_summarize(args: argparse.Namespace) -> None:
     settings = _build_settings(args)
     processor = MeetingProcessor(settings)
 
-    result = processor.process(args.source, upload=args.upload)
+    result = processor.process(args.source, upload=args.upload, context=getattr(args, "context", None))
     stem = Path(result.source_filename).stem
 
     transcript_path = Path(f"{stem}_transcript.md")

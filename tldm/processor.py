@@ -90,6 +90,8 @@ Rules:
   - For each point, capture WHAT happened AND WHY (the reasoning or context)
   - Each topic should have 5-15 bullets — completeness over brevity
   - It is OK to have many topics and many bullets
+- Before finalizing, scan the transcript again: is there any topic discussed for
+  more than 2 minutes that doesn't appear in your notes? If so, add it.
 - Action items include owner by name when identifiable
 
 Transcript:
@@ -109,13 +111,21 @@ class MeetingProcessor:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
 
-    def process(self, source: str, *, credentials: object | None = None, upload: bool = False) -> MeetingResult:
+    def process(
+        self,
+        source: str,
+        *,
+        credentials: object | None = None,
+        upload: bool = False,
+        context: str | None = None,
+    ) -> MeetingResult:
         """Run the full pipeline: download, extract audio, transcribe, summarize, and optionally upload.
 
         Args:
             source: Local file path, Google Drive URL, or file ID.
             credentials: Optional explicit credentials (for server OAuth flow).
             upload: If True, upload the result to the same Drive folder as the source video.
+            context: Optional context about the meeting to guide summarization.
 
         Returns:
             MeetingResult with transcript and summary.
@@ -140,7 +150,7 @@ class MeetingProcessor:
             logger.info("[3/4] Transcribing...")
             transcript = self._transcribe_audio(audio_path)
             logger.info("[4/4] Summarizing...")
-            summary = self._summarize(transcript)
+            summary = self._summarize(transcript, context=context)
             result = MeetingResult(transcript=transcript, summary=summary, source_filename=filename)
 
             if upload and file_id:
@@ -249,11 +259,12 @@ class MeetingProcessor:
 
     _SUMMARY_MAX_RETRIES = 3
 
-    def _summarize(self, transcript: Transcript) -> Summary:
+    def _summarize(self, transcript: Transcript, *, context: str | None = None) -> Summary:
         """Summarize transcript with retry on incomplete output.
 
         Args:
             transcript: The meeting transcript to summarize.
+            context: Optional context about the meeting to guide summarization.
 
         Returns:
             Summary with all sections populated.
@@ -263,6 +274,8 @@ class MeetingProcessor:
         language = transcript.language if transcript.language else "the same language as the transcript"
         transcript_md = transcript.to_markdown()
         prompt = SUMMARY_PROMPT % (language, transcript_md)
+        if context:
+            prompt = f"Context about this meeting: {context}\n\n{prompt}"
 
         for attempt in range(1, self._SUMMARY_MAX_RETRIES + 1):
             response = litellm.completion(
