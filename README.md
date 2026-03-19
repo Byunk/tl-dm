@@ -1,11 +1,11 @@
 # tl;dm - Too Long; Did Meet
 
-Turn any Google Meet recording into a transcript + summary in one command.
-No $20/month subscription. No cloud lock-in. Knows who said what.
+Turn any video or audio into a transcript + summary in one command.
+Works with local files and Google Drive. No $20/month subscription. No cloud lock-in. Knows who said what.
 
 ## Install
 
-Requires [uv](https://docs.astral.sh/uv/), [ffmpeg](https://ffmpeg.org/), and [gcloud CLI](https://cloud.google.com/sdk/docs/install).
+Requires [uv](https://docs.astral.sh/uv/) and [ffmpeg](https://ffmpeg.org/). [gcloud CLI](https://cloud.google.com/sdk/docs/install) is only needed for Google Drive features.
 
 ```bash
 uv tool install git+https://github.com/Byunk/tl-dm.git
@@ -18,7 +18,19 @@ git clone https://github.com/Byunk/tl-dm.git && cd tl-dm
 uv sync
 ```
 
-### Google Drive Authentication
+### LLM API Key
+
+```bash
+export GEMINI_API_KEY="your-key"
+# Or for other providers:
+# export OPENROUTER_API_KEY="your-key"
+# export OPENAI_API_KEY="your-key"
+# export ANTHROPIC_API_KEY="your-key"
+```
+
+### Google Drive (optional)
+
+Only needed if you want to process files from Google Drive or upload results back to Drive.
 
 Each user must set up their own GCP project (Google does not allow unverified apps to be used by arbitrary users).
 
@@ -47,30 +59,24 @@ Each user must set up their own GCP project (Google does not allow unverified ap
      --scopes=https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/drive
    ```
 
-### LLM API Key
-
-```bash
-export GEMINI_API_KEY="your-key"
-# Or for other providers:
-# export OPENROUTER_API_KEY="your-key"
-# export OPENAI_API_KEY="your-key"
-# export ANTHROPIC_API_KEY="your-key"
-```
-
 ## Usage
 
 ```bash
-# Transcribe only
-tldm transcribe <drive-url-or-file-id>
+# Local video file
+tldm transcribe recording.mp4
+tldm summarize ~/Downloads/meeting.mp4
 
-# Transcribe + summarize
+# Local audio file (skips ffmpeg extraction)
+tldm transcribe interview.mp3
+
+# Google Drive
 tldm summarize <drive-url-or-file-id>
 
 # Upload results to the same Drive folder
 tldm summarize <drive-url-or-file-id> --upload
 
 # Use a different model
-tldm summarize <drive-url> --model gemini/gemini-2.5-flash
+tldm summarize recording.mp4 --model gemini/gemini-2.5-flash
 tldm summarize <drive-url> --summary-model openrouter/anthropic/claude-sonnet-4
 ```
 

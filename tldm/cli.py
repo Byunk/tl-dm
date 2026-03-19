@@ -17,13 +17,13 @@ def main() -> None:
 
     # transcribe
     tx_parser = subparsers.add_parser("transcribe", help="Transcribe a meeting video")
-    tx_parser.add_argument("source", help="Google Drive URL or file ID")
+    tx_parser.add_argument("source", help="Local file path, Google Drive URL, or file ID")
     tx_parser.add_argument("--model", "-m", help="Gemini model for transcription")
     tx_parser.add_argument("--upload", "-u", action="store_true", help="Upload results to the same Drive folder")
 
     # summarize
     sm_parser = subparsers.add_parser("summarize", help="Transcribe and summarize a meeting video")
-    sm_parser.add_argument("source", help="Google Drive URL or file ID")
+    sm_parser.add_argument("source", help="Local file path, Google Drive URL, or file ID")
     sm_parser.add_argument("--model", "-m", help="Model for transcription")
     sm_parser.add_argument("--summary-model", help="Model for summary (defaults to --model)")
     sm_parser.add_argument("--upload", "-u", action="store_true", help="Upload results to the same Drive folder")

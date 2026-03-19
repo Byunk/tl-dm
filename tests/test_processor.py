@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from tldm.config import Settings
-from tldm.models import Note, Section, Segment, Summary, Transcript
+from tldm.models import Segment, Summary, Transcript
 from tldm.processor import MeetingProcessor
 
 
@@ -39,17 +39,7 @@ def sample_summary():
         key_points=["Discussed project timeline"],
         action_items=["Review PR (Owner: Alice)"],
         participants=["Alice — engineering lead", "Bob — PM"],
-        notes=[
-            Section(
-                topic="Timeline",
-                notes=[
-                    Note(
-                        finding="Deadline is Friday",
-                        reasoning="Client demo scheduled for Monday",
-                    )
-                ],
-            )
-        ],
+        notes={"Timeline": ["Deadline is Friday because client demo is scheduled for Monday"]},
     )
 
 
@@ -134,3 +124,40 @@ class TestMeetingProcessor:
 
         summary_call = mock_litellm.completion.call_args_list[1]
         assert "English" in summary_call.kwargs["messages"][0]["content"]
+
+    @patch("tldm.processor.litellm")
+    def test_transcribe_local_video(self, mock_litellm, processor, sample_transcript, tmp_path):
+        video_file = tmp_path / "local_meeting.mp4"
+        video_file.write_bytes(b"fake video")
+
+        mock_response = Mock(choices=[Mock(message=Mock(content=sample_transcript.model_dump_json()))])
+        mock_litellm.completion.return_value = mock_response
+
+        with patch.object(MeetingProcessor, "_run_ffmpeg") as mock_ffmpeg:
+
+            def create_audio(video_path, audio_path):
+                audio_path.write_bytes(b"fake audio")
+
+            mock_ffmpeg.side_effect = create_audio
+
+            result = processor.transcribe_only(str(video_file))
+
+        assert result.source_filename == "local_meeting.mp4"
+        assert len(result.transcript.segments) == 2
+        mock_ffmpeg.assert_called_once()
+        mock_litellm.completion.assert_called_once()
+
+    @patch("tldm.processor.litellm")
+    def test_transcribe_local_audio(self, mock_litellm, processor, sample_transcript, tmp_path):
+        audio_file = tmp_path / "recording.mp3"
+        audio_file.write_bytes(b"fake audio")
+
+        mock_response = Mock(choices=[Mock(message=Mock(content=sample_transcript.model_dump_json()))])
+        mock_litellm.completion.return_value = mock_response
+
+        with patch.object(MeetingProcessor, "_run_ffmpeg") as mock_ffmpeg:
+            result = processor.transcribe_only(str(audio_file))
+
+        assert result.source_filename == "recording.mp3"
+        mock_ffmpeg.assert_not_called()
+        mock_litellm.completion.assert_called_once()

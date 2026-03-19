@@ -1,4 +1,5 @@
 import base64
+import json
 import logging
 import tempfile
 from pathlib import Path
@@ -67,31 +68,30 @@ Return a JSON object matching this schema:
   "key_points": ["High-level summary point"],
   "action_items": ["Task description (Owner: Name)"],
   "participants": ["Name — role/background"],
-  "notes": [
-    {
-      "topic": "Topic name",
-      "notes": [
-        {
-          "finding": "What was said or observed",
-          "reasoning": "Why — the motivation or context behind it",
-          "quote": "Notable verbatim quote, or empty string if none"
-        }
-      ]
-    }
-  ]
+  "notes": {
+    "Topic name": [
+      "Finding and WHY — include the reasoning, not just the fact",
+      "Another finding with context and motivation behind it"
+    ]
+  }
 }
 
 Rules:
 - Title should state the meeting's purpose
 - Key points: 5-10 points covering all major topics
 - Notes are the most detailed section — be thorough, not minimal
-  - Each topic should have 3-15 findings
-  - It is OK to have many topics and many findings — completeness over brevity
+  - Write in full descriptive sentences, not keyword fragments
+  - For each point, capture WHAT happened AND WHY (the reasoning or context)
+  - Each topic should have 5-15 bullets — completeness over brevity
+  - It is OK to have many topics and many bullets
 - Action items include owner by name when identifiable
 
 Transcript:
 %s
 """
+
+
+AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".ogg", ".flac", ".aac"}
 
 
 class MeetingProcessor:
@@ -103,79 +103,97 @@ class MeetingProcessor:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
 
-    def process(self, drive_input: str, *, credentials: object | None = None, upload: bool = False) -> MeetingResult:
+    def process(self, source: str, *, credentials: object | None = None, upload: bool = False) -> MeetingResult:
         """Run the full pipeline: download, extract audio, transcribe, summarize, and optionally upload.
 
         Args:
-            drive_input: Google Drive URL or file ID.
+            source: Local file path, Google Drive URL, or file ID.
             credentials: Optional explicit credentials (for server OAuth flow).
             upload: If True, upload the result to the same Drive folder as the source video.
 
         Returns:
             MeetingResult with transcript and summary.
         """
-        logger.info("[1/4] Starting pipeline for: %s", drive_input)
+        logger.info("[1/4] Starting pipeline for: %s", source)
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
-            file_id = parse_drive_input(drive_input)
-            if credentials is None:
-                credentials = resolve_credentials(self.settings)
 
-            logger.info("[2/4] Downloading and extracting audio...")
-            audio_path, filename = self._download_and_extract_audio(file_id, tmp_path, credentials=credentials)
+            if Path(source).is_file():
+                source_path = Path(source)
+                filename = source_path.name
+                file_id = None
+            else:
+                file_id = parse_drive_input(source)
+                if credentials is None:
+                    credentials = resolve_credentials(self.settings)
+                logger.info("[2/4] Downloading from Drive...")
+                source_path = download_file(file_id, credentials, tmp_path)
+                filename = source_path.name
+
+            audio_path = self._extract_audio(source_path, tmp_path)
             logger.info("[3/4] Transcribing...")
             transcript = self._transcribe_audio(audio_path)
             logger.info("[4/4] Summarizing...")
             summary = self._summarize(transcript)
             result = MeetingResult(transcript=transcript, summary=summary, source_filename=filename)
 
-            if upload:
+            if upload and file_id:
                 logger.info("Uploading result to Drive...")
                 self._upload_to_drive(file_id, filename, result, credentials)
+            elif upload:
+                logger.warning("Upload requires a Google Drive source — skipping upload for local file")
             logger.info("Done!")
             return result
 
-    def transcribe_only(
-        self, drive_input: str, *, credentials: object | None = None, upload: bool = False
-    ) -> MeetingResult:
+    def transcribe_only(self, source: str, *, credentials: object | None = None, upload: bool = False) -> MeetingResult:
         """Run the pipeline without the summary step.
 
         Args:
-            drive_input: Google Drive URL or file ID.
+            source: Local file path, Google Drive URL, or file ID.
             credentials: Optional explicit credentials (for server OAuth flow).
             upload: If True, upload the result to the same Drive folder as the source video.
 
         Returns:
             MeetingResult with transcript only.
         """
-        logger.info("[1/3] Starting pipeline for: %s", drive_input)
+        logger.info("[1/3] Starting pipeline for: %s", source)
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
-            file_id = parse_drive_input(drive_input)
-            if credentials is None:
-                credentials = resolve_credentials(self.settings)
 
-            logger.info("[2/3] Downloading and extracting audio...")
-            audio_path, filename = self._download_and_extract_audio(file_id, tmp_path, credentials=credentials)
+            if Path(source).is_file():
+                source_path = Path(source)
+                filename = source_path.name
+                file_id = None
+            else:
+                file_id = parse_drive_input(source)
+                if credentials is None:
+                    credentials = resolve_credentials(self.settings)
+                logger.info("[2/3] Downloading from Drive...")
+                source_path = download_file(file_id, credentials, tmp_path)
+                filename = source_path.name
+
+            audio_path = self._extract_audio(source_path, tmp_path)
             logger.info("[3/3] Transcribing...")
             transcript = self._transcribe_audio(audio_path)
             result = MeetingResult(transcript=transcript, source_filename=filename)
 
-            if upload:
+            if upload and file_id:
                 logger.info("Uploading result to Drive...")
                 self._upload_to_drive(file_id, filename, result, credentials)
+            elif upload:
+                logger.warning("Upload requires a Google Drive source — skipping upload for local file")
             logger.info("Done!")
             return result
 
-    def _download_and_extract_audio(self, file_id: str, tmp_dir: Path, *, credentials: object) -> tuple[Path, str]:
-        video_path = download_file(file_id, credentials, tmp_dir)
-        filename = video_path.name
+    def _extract_audio(self, source_path: Path, tmp_dir: Path) -> Path:
+        if source_path.suffix.lower() in AUDIO_EXTENSIONS:
+            logger.info("Source is already audio: %s", source_path.name)
+            return source_path
 
-        audio_path = tmp_dir / f"{video_path.stem}.mp3"
-        logger.info("Extracting audio: %s → %s", video_path.name, audio_path.name)
-
-        self._run_ffmpeg(video_path, audio_path)
-        return audio_path, filename
+        audio_path = tmp_dir / f"{source_path.stem}.mp3"
+        logger.info("Extracting audio: %s → %s", source_path.name, audio_path.name)
+        self._run_ffmpeg(source_path, audio_path)
+        return audio_path
 
     @staticmethod
     def _upload_to_drive(file_id: str, source_filename: str, result: MeetingResult, credentials: object) -> None:
@@ -245,10 +263,25 @@ class MeetingProcessor:
                 model=self.settings.summary_model,
                 messages=[{"role": "user", "content": prompt}],
                 response_format=Summary,
-                reasoning_effort="high",
+                reasoning_effort="low",
+                max_tokens=65536,
             )
 
             raw = response.choices[0].message.content
+            logger.info("Raw summary response: %d chars", len(raw))
+            try:
+                parsed = json.loads(raw)
+            except json.JSONDecodeError:
+                logger.warning(
+                    "Summary attempt %d/%d returned truncated JSON, retrying...", attempt, self._SUMMARY_MAX_RETRIES
+                )
+                continue
+
+            logger.info(
+                "Parsed fields: %s, notes count: %d",
+                list(parsed.keys()),
+                len(parsed.get("notes", [])),
+            )
             summary = Summary.model_validate_json(raw)
 
             if summary.notes:
@@ -259,8 +292,10 @@ class MeetingProcessor:
                 "Summary attempt %d/%d returned empty notes, retrying...", attempt, self._SUMMARY_MAX_RETRIES
             )
 
-        logger.warning("All %d summary attempts returned empty notes, returning best effort", self._SUMMARY_MAX_RETRIES)
-        return summary
+        logger.warning(
+            "All %d summary attempts returned incomplete output, returning best effort", self._SUMMARY_MAX_RETRIES
+        )
+        return Summary.model_validate_json(raw)
 
     @staticmethod
     def _run_ffmpeg(video_path: Path, audio_path: Path) -> None:
