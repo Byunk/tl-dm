@@ -23,10 +23,11 @@ def processor(settings):
 @pytest.fixture
 def sample_transcript():
     return Transcript(
+        language="English",
         segments=[
             Segment(speaker="Speaker 1", start_time="00:00:00", end_time="00:00:10", text="Hello everyone"),
             Segment(speaker="Speaker 2", start_time="00:00:11", end_time="00:00:20", text="Hi, thanks for joining"),
-        ]
+        ],
     )
 
 
@@ -119,3 +120,6 @@ class TestMeetingProcessor:
         assert result.summary is not None
         assert result.summary.title == "Team Standup: Align on project timeline"
         assert mock_litellm.completion.call_count == 2
+
+        summary_call = mock_litellm.completion.call_args_list[1]
+        assert "English" in summary_call.kwargs["messages"][0]["content"]

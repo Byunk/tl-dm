@@ -18,9 +18,11 @@ Transcribe this audio with speaker diarization.
 Identify distinct speakers as Speaker 1, Speaker 2, etc.
 Include timestamps for each segment.
 Preserve the original language — do not translate.
+Detect the language being spoken and return it in the "language" field.
 
 Return a JSON object matching this schema:
 {
+  "language": "Korean",
   "segments": [
     {
       "speaker": "Speaker 1",
@@ -33,6 +35,8 @@ Return a JSON object matching this schema:
 """
 
 SUMMARY_PROMPT = """\
+Write ALL output in %s. Only JSON keys stay in English.
+
 Analyze this meeting transcript thoroughly.
 
 First, reason about the purpose of this meeting.
@@ -60,7 +64,6 @@ Rules:
   - Group by logical topic, not chronological order
   - It is OK to have many topics and many bullets — completeness over brevity
 - Action items include owner when identifiable
-- Write the summary in the same language as the transcript
 
 Transcript:
 %s
@@ -199,8 +202,9 @@ class MeetingProcessor:
     def _summarize(self, transcript: Transcript) -> Summary:
         logger.info("Summarizing %d segments with %s...", len(transcript.segments), self.settings.summary_model)
 
+        language = transcript.language if transcript.language else "the same language as the transcript"
         transcript_md = transcript.to_markdown()
-        prompt = SUMMARY_PROMPT % transcript_md
+        prompt = SUMMARY_PROMPT % (language, transcript_md)
 
         response = litellm.completion(
             model=self.settings.summary_model,

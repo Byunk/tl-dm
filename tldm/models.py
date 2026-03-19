@@ -14,6 +14,7 @@ class Transcript(BaseModel):
     """Full meeting transcript with speaker-labeled segments."""
 
     segments: list[Segment]
+    language: str = ""
 
     def to_markdown(self) -> str:
         """Format transcript as markdown with speaker labels and timestamps.
