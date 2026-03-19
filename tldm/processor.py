@@ -60,6 +60,7 @@ Rules:
   - Group by logical topic, not chronological order
   - It is OK to have many topics and many bullets — completeness over brevity
 - Action items include owner when identifiable
+- Write the summary in the same language as the transcript
 
 Transcript:
 %s
