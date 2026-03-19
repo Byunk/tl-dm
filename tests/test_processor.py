@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from tldm.config import Settings
-from tldm.models import Segment, Summary, Transcript
+from tldm.models import Note, Section, Segment, Summary, Transcript
 from tldm.processor import MeetingProcessor
 
 
@@ -37,8 +37,19 @@ def sample_summary():
         title="Team Standup: Align on project timeline",
         excerpt="The team discussed the project timeline and assigned PR reviews.",
         key_points=["Discussed project timeline"],
-        notes={"Timeline": ["deadline: Friday", "blocker: API review"]},
-        action_items=["Review PR (Owner: Speaker 1)"],
+        action_items=["Review PR (Owner: Alice)"],
+        participants=["Alice — engineering lead", "Bob — PM"],
+        notes=[
+            Section(
+                topic="Timeline",
+                notes=[
+                    Note(
+                        finding="Deadline is Friday",
+                        reasoning="Client demo scheduled for Monday",
+                    )
+                ],
+            )
+        ],
     )
 
 

@@ -1,8 +1,7 @@
-# tl;dm
+# tl;dm - Too Long; Did Meet
 
-Google Meet charges $20/month for "premium" — and still can't summarize your meetings. So I built my own.
-
-Generate transcriptions (with speaker diarization) and meeting summaries from Google Drive recordings using AI.
+Turn any Google Meet recording into a transcript + summary in one command.
+No $20/month subscription. No cloud lock-in. Knows who said what.
 
 ## Install
 

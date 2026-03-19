@@ -35,35 +35,59 @@ Return a JSON object matching this schema:
 """
 
 SUMMARY_PROMPT = """\
+You are an experienced meeting note taker. Write comprehensive, decision-ready
+notes that capture not just what was said, but WHY.
+
+Your audience is the meeting organizer who needs to:
+- Recall every important detail without re-watching
+- Make decisions based on these notes
+- Share them with teammates who weren't present
+
 Write ALL output in %s. Only JSON keys stay in English.
 
-Analyze this meeting transcript thoroughly.
+## Instructions
 
-First, reason about the purpose of this meeting.
-Then extract key points, comprehensive notes (grouped by topic), and action items.
+1. **Identify participants** by name from the transcript (people often introduce
+   themselves). Use real names instead of "Speaker 1".
+2. **Key points**: 5-10 high-level points covering the major topics discussed.
+3. **Notes**: Group findings by topic, not chronologically.
+   For each finding, capture:
+   - The finding itself (what was said or observed)
+   - The reasoning behind it (why — motivation, context, cause)
+   - A verbatim quote if particularly notable (otherwise leave empty)
+4. Include specific numbers, names, dates, examples, and anecdotes.
+5. Write in full descriptive phrases, not keyword fragments.
+6. **Key points** summarize what was discussed; **notes** go deep on each topic.
+7. Action items include owner (by name) when identifiable.
 
 Return a JSON object matching this schema:
 {
-  "title": "Purpose-driven title, e.g. 'Weekly sync: Align on Q2 launch timeline'",
+  "title": "Purpose-driven title, not just 'Meeting Summary'",
   "excerpt": "2-3 sentences: what happened and what was decided",
-  "key_points": ["point 1", "point 2", "..."],
-  "notes": {
-    "Topic A": ["keyword: detail", "keyword: more detail", "sub-point", "..."],
-    "Topic B": ["keyword: detail", "context", "..."]
-  },
-  "action_items": ["Task description (Owner: Speaker N)"]
+  "key_points": ["High-level summary point"],
+  "action_items": ["Task description (Owner: Name)"],
+  "participants": ["Name — role/background"],
+  "notes": [
+    {
+      "topic": "Topic name",
+      "notes": [
+        {
+          "finding": "What was said or observed",
+          "reasoning": "Why — the motivation or context behind it",
+          "quote": "Notable verbatim quote, or empty string if none"
+        }
+      ]
+    }
+  ]
 }
 
 Rules:
-- Title should state the meeting's purpose, not just "Meeting Summary"
-- Key points: 5-10 points covering all major topics discussed
-- Notes are the most detailed section — capture everything important from the meeting
-  - Use keyword/phrase style (not full sentences), e.g. "deadline: March 30", "blocker: API rate limit"
-  - Include specifics: names, numbers, dates, decisions, concerns, alternatives discussed
-  - Each topic cluster should have 5-15 bullets — be thorough, not minimal
-  - Group by logical topic, not chronological order
-  - It is OK to have many topics and many bullets — completeness over brevity
-- Action items include owner when identifiable
+- Title should state the meeting's purpose
+- Key points: 5-10 points covering all major topics
+- Notes are the most detailed section — be thorough, not minimal
+  - Each topic should have 3-15 findings
+  - It is OK to have many topics and many findings — completeness over brevity
+- Action items include owner by name when identifiable
 
 Transcript:
 %s
@@ -199,22 +223,44 @@ class MeetingProcessor:
         logger.info("Transcription complete (%d chars)", len(raw))
         return Transcript.model_validate_json(raw)
 
+    _SUMMARY_MAX_RETRIES = 2
+
     def _summarize(self, transcript: Transcript) -> Summary:
+        """Summarize transcript with retry on incomplete output.
+
+        Args:
+            transcript: The meeting transcript to summarize.
+
+        Returns:
+            Summary with all sections populated.
+        """
         logger.info("Summarizing %d segments with %s...", len(transcript.segments), self.settings.summary_model)
 
         language = transcript.language if transcript.language else "the same language as the transcript"
         transcript_md = transcript.to_markdown()
         prompt = SUMMARY_PROMPT % (language, transcript_md)
 
-        response = litellm.completion(
-            model=self.settings.summary_model,
-            messages=[{"role": "user", "content": prompt}],
-            response_format=Summary,
-        )
+        for attempt in range(1, self._SUMMARY_MAX_RETRIES + 1):
+            response = litellm.completion(
+                model=self.settings.summary_model,
+                messages=[{"role": "user", "content": prompt}],
+                response_format=Summary,
+                reasoning_effort="high",
+            )
 
-        raw = response.choices[0].message.content
-        logger.info("Summary complete")
-        return Summary.model_validate_json(raw)
+            raw = response.choices[0].message.content
+            summary = Summary.model_validate_json(raw)
+
+            if summary.notes:
+                logger.info("Summary complete")
+                return summary
+
+            logger.warning(
+                "Summary attempt %d/%d returned empty notes, retrying...", attempt, self._SUMMARY_MAX_RETRIES
+            )
+
+        logger.warning("All %d summary attempts returned empty notes, returning best effort", self._SUMMARY_MAX_RETRIES)
+        return summary
 
     @staticmethod
     def _run_ffmpeg(video_path: Path, audio_path: Path) -> None:

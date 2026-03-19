@@ -29,14 +29,30 @@ class Transcript(BaseModel):
         return "\n".join(lines)
 
 
+class Note(BaseModel):
+    """A single finding with optional reasoning and quote."""
+
+    finding: str
+    reasoning: str = ""
+    quote: str = ""
+
+
+class Section(BaseModel):
+    """A topic section containing multiple notes."""
+
+    topic: str
+    notes: list[Note]
+
+
 class Summary(BaseModel):
     """Meeting summary with purpose-driven structure."""
 
     title: str
     excerpt: str
     key_points: list[str]
-    notes: dict[str, list[str]]
     action_items: list[str]
+    participants: list[str] = []
+    notes: list[Section] = []
 
     def to_markdown(self) -> str:
         """Format summary as markdown.
@@ -47,19 +63,29 @@ class Summary(BaseModel):
         lines = [f"# {self.title}\n"]
         lines.append(f"{self.excerpt}\n")
 
+        if self.participants:
+            lines.append("## Participants\n")
+            lines.extend(f"- {p}" for p in self.participants)
+            lines.append("")
+
         lines.append("## Key Points\n")
         lines.extend(f"- {point}" for point in self.key_points)
 
+        if self.action_items:
+            lines.append("\n## Action Items\n")
+            lines.extend(f"- [ ] {item}" for item in self.action_items)
+
         if self.notes:
             lines.append("\n## Notes\n")
-            for topic, bullets in self.notes.items():
-                lines.append(f"### {topic}\n")
-                lines.extend(f"- {b}" for b in bullets)
+            for section in self.notes:
+                lines.append(f"### {section.topic}\n")
+                for note in section.notes:
+                    lines.append(f"- {note.finding}")
+                    if note.reasoning:
+                        lines.append(f"  - Why: {note.reasoning}")
+                    if note.quote:
+                        lines.append(f'  - > "{note.quote}"')
                 lines.append("")
-
-        if self.action_items:
-            lines.append("## Action Items\n")
-            lines.extend(f"- [ ] {item}" for item in self.action_items)
 
         return "\n".join(lines)
 
