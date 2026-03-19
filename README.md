@@ -1,36 +1,83 @@
 # tl;dm - Too Long; Did Meet
 
-Turn any video or audio into a transcript + summary in one command.
-Works with local files and Google Drive. No $20/month subscription. No cloud lock-in. Knows who said what.
+One command. Full transcript with speaker names. Decision-ready summary. From any meeting recording.
 
-## Install
+No $20/month subscription. No cloud lock-in. Runs on your machine.
 
-Requires [uv](https://docs.astral.sh/uv/) and [ffmpeg](https://ffmpeg.org/). [gcloud CLI](https://cloud.google.com/sdk/docs/install) is only needed for Google Drive features.
+## See it in action
+
+Input: [Ilya Sutskever on Dwarkesh Patel](https://www.youtube.com/watch?v=aR20FWCCjAs) (1h 36m podcast)
+
+```bash
+tldm summarize ilya_dwarkesh.mp3 --context "Podcast interview about the future of AI"
+```
+
+Output ([full summary](examples/ilya_dwarkesh_summary.md) | [full transcript](examples/ilya_dwarkesh_transcript.md)):
+
+> **Transitioning to the Age of Research: Ilya Sutskever on the Path to Safe Superintelligence**
+>
+> Ilya Sutskever discusses the limitations of current AI scaling, the founding philosophy
+> of SSI, and the necessity of aligning AI with sentient life. The conversation explores
+> why current models lack real-world economic impact despite high benchmark scores.
+>
+> **Participants**
+> - Ilya Sutskever — Co-founder and Chief Scientist of SSI, formerly at OpenAI
+> - Dwarkesh Patel — Host of the Dwarkesh Podcast
+>
+> **Key Points**
+> - Significant disconnect between benchmark performance and actual economic impact
+> - The "Age of Scaling" is shifting back to an "Age of Research" as novel ideas deplete
+> - RL scaling follows a sigmoid curve, not the power law seen in pre-training
+> - Human learning is far more sample-efficient than AI, suggesting undiscovered ML principles
+> - SSI adopts a "straight shot" strategy, avoiding the market rat race of intermediate releases
+> - Alignment may work better focused on "sentient life" broadly rather than human life specifically
+> - Research taste — top-down intuition for simplicity — sustains breakthroughs through failure
+> - Timeline for human-like learner that becomes superhuman: 5 to 20 years
+
+Identified speakers by name. Extracted key decisions. Ready to share — in under 5 minutes.
+
+## Quick Start
 
 ```bash
 uv tool install git+https://github.com/Byunk/tl-dm.git
-```
-
-For development:
-
-```bash
-git clone https://github.com/Byunk/tl-dm.git && cd tl-dm
-uv sync
-```
-
-### LLM API Key
-
-```bash
 export GEMINI_API_KEY="your-key"
-# Or for other providers:
-# export OPENROUTER_API_KEY="your-key"
-# export OPENAI_API_KEY="your-key"
-# export ANTHROPIC_API_KEY="your-key"
+tldm summarize recording.mp4
 ```
 
-### Google Drive (optional)
+Requires [uv](https://docs.astral.sh/uv/) and [ffmpeg](https://ffmpeg.org/).
 
-Only needed if you want to process files from Google Drive or upload results back to Drive.
+## Usage
+
+```bash
+# Local video or audio
+tldm summarize meeting.mp4
+tldm transcribe interview.mp3
+
+# Google Drive — download, process, and upload results back
+tldm summarize <drive-url> --upload
+
+# Add context for better summaries
+tldm summarize standup.mp4 --context "Daily standup, focus on blockers"
+
+# Mix and match models
+tldm summarize recording.mp4 --model gemini/gemini-2.5-flash
+tldm summarize recording.mp4 --summary-model openrouter/anthropic/claude-sonnet-4
+```
+
+## Configuration
+
+| Setting | Default | Env var |
+|---------|---------|---------|
+| Transcription model | `gemini/gemini-3.1-flash-lite-preview` | `TLDM_TRANSCRIPTION_MODEL` |
+| Summary model | `gemini/gemini-3.1-flash-lite-preview` | `TLDM_SUMMARY_MODEL` |
+| Service account path | (none) | `TLDM_SERVICE_ACCOUNT_PATH` |
+
+Any model available through [LiteLLM](https://docs.litellm.ai/docs/providers) works. Transcription requires a model that supports audio input (currently Gemini models).
+
+<details>
+<summary>Google Drive setup (optional)</summary>
+
+Only needed if you want to process files from Google Drive or upload results back to Drive. Requires [gcloud CLI](https://cloud.google.com/sdk/docs/install).
 
 Each user must set up their own GCP project (Google does not allow unverified apps to be used by arbitrary users).
 
@@ -59,39 +106,11 @@ Each user must set up their own GCP project (Google does not allow unverified ap
      --scopes=https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/drive
    ```
 
-## Usage
+</details>
+
+## Development
 
 ```bash
-# Local video file
-tldm transcribe recording.mp4
-tldm summarize ~/Downloads/meeting.mp4
-
-# Local audio file (skips ffmpeg extraction)
-tldm transcribe interview.mp3
-
-# Google Drive
-tldm summarize <drive-url-or-file-id>
-
-# Upload results to the same Drive folder
-tldm summarize <drive-url-or-file-id> --upload
-
-# Use a different model
-tldm summarize recording.mp4 --model gemini/gemini-2.5-flash
-tldm summarize <drive-url> --summary-model openrouter/anthropic/claude-sonnet-4
+git clone https://github.com/Byunk/tl-dm.git && cd tl-dm
+uv sync
 ```
-
-## Configuration
-
-Settings are loaded in order: constructor > env vars > defaults.
-
-| Setting | Default | Env var |
-|---------|---------|---------|
-| Transcription model | `gemini/gemini-3.1-flash-lite-preview` | `TLDM_TRANSCRIPTION_MODEL` |
-| Summary model | `gemini/gemini-3.1-flash-lite-preview` | `TLDM_SUMMARY_MODEL` |
-| Service account path | (none) | `TLDM_SERVICE_ACCOUNT_PATH` |
-
-## Supported Models
-
-Any model available through [LiteLLM](https://docs.litellm.ai/docs/providers) works.
-
-Note: Transcription requires a model that supports audio input (currently Gemini models).
