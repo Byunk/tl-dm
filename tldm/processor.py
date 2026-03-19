@@ -68,12 +68,18 @@ Return a JSON object matching this schema:
   "key_points": ["High-level summary point"],
   "action_items": ["Task description (Owner: Name)"],
   "participants": ["Name — role/background"],
-  "notes": {
-    "Topic name": [
-      "Finding and WHY — include the reasoning, not just the fact",
-      "Another finding with context and motivation behind it"
-    ]
-  }
+  "notes": [
+    {
+      "topic": "Topic name",
+      "notes": [
+        {
+          "finding": "What was said or observed",
+          "reasoning": "Why — the motivation or context behind it",
+          "quote": "Notable verbatim quote, or empty string if none"
+        }
+      ]
+    }
+  ]
 }
 
 Rules:
@@ -241,7 +247,7 @@ class MeetingProcessor:
         logger.info("Transcription complete (%d chars)", len(raw))
         return Transcript.model_validate_json(raw)
 
-    _SUMMARY_MAX_RETRIES = 2
+    _SUMMARY_MAX_RETRIES = 3
 
     def _summarize(self, transcript: Transcript) -> Summary:
         """Summarize transcript with retry on incomplete output.
@@ -263,25 +269,22 @@ class MeetingProcessor:
                 model=self.settings.summary_model,
                 messages=[{"role": "user", "content": prompt}],
                 response_format=Summary,
-                reasoning_effort="low",
+                reasoning_effort="medium",
                 max_tokens=65536,
             )
 
             raw = response.choices[0].message.content
-            logger.info("Raw summary response: %d chars", len(raw))
             try:
-                parsed = json.loads(raw)
+                json.loads(raw)
             except json.JSONDecodeError:
                 logger.warning(
-                    "Summary attempt %d/%d returned truncated JSON, retrying...", attempt, self._SUMMARY_MAX_RETRIES
+                    "Summary attempt %d/%d returned truncated JSON (%d chars), retrying...",
+                    attempt,
+                    self._SUMMARY_MAX_RETRIES,
+                    len(raw),
                 )
                 continue
 
-            logger.info(
-                "Parsed fields: %s, notes count: %d",
-                list(parsed.keys()),
-                len(parsed.get("notes", [])),
-            )
             summary = Summary.model_validate_json(raw)
 
             if summary.notes:
