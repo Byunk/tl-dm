@@ -50,7 +50,7 @@ class Summary(BaseModel):
     title: str
     excerpt: str
     key_points: list[str]
-    action_items: list[str]
+    action_items: list[str] = []
     participants: list[str] = []
     notes: list[Section] = []
 
