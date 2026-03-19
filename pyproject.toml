@@ -4,6 +4,11 @@ version = "0.1.0"
 description = "Too Long; Did Meet"
 readme = "README.md"
 requires-python = ">=3.12"
+license = "Apache-2.0"
+authors = [
+    { name = "Kyungho Byoun", email = "kyungho.byoun@gmail.com" },
+]
+
 dependencies = [
     "pydantic==2.12.5",
     "pydantic-settings==2.13.1",
@@ -11,6 +16,9 @@ dependencies = [
     "google-api-python-client==2.193.0",
     "ffmpeg-python==0.2.0",
 ]
+
+[project.urls]
+Repository = "https://github.com/Byunk/tl-dm"
 
 [project.scripts]
 tldm = "tldm.cli:main"
