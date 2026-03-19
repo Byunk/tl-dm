@@ -11,6 +11,13 @@
 - Add docstrings for public methods with Args, Returns, and Raises sections (if applicable).
 - Do not add docstrings for private methods.
 
+## Code Quality
+
+- Avoid double I/O: if you already have a value (e.g., file duration), pass it as a parameter instead of re-reading.
+- One method, one job: if a method handles more than 3 concerns, extract helpers.
+- Test the actual code, not a reimplementation of the logic.
+- Don't suppress lint rules globally to work around one test. Fix the test.
+
 ## Testing
 
 - Use pure pytest for testing.
